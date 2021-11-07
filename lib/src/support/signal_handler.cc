@@ -27,7 +27,7 @@
 #include <unistd.h>
 
 #ifndef SRSRAN_TERM_TIMEOUT_S
-#define SRSRAN_TERM_TIMEOUT_S (5)
+#define SRSRAN_TERM_TIMEOUT_S (10)
 #endif
 
 /// Handler called after the user interrupts the program.
