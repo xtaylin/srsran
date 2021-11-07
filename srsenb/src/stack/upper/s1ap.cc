@@ -525,7 +525,7 @@ bool s1ap::setup_s1()
   container.global_enb_id.value.plm_nid[1]  = ((uint8_t*)&plmn)[2];
   container.global_enb_id.value.plm_nid[2]  = ((uint8_t*)&plmn)[3];
 
-  container.global_enb_id.value.enb_id.set_macro_enb_id().from_number(args.enb_id);
+  container.global_enb_id.value.enb_id.set_home_enb_id().from_number((uint32_t)(args.enb_id << 8) | args.cell_id);
 
   container.enbname_present = true;
   container.enbname.value.from_string(args.enb_name);
