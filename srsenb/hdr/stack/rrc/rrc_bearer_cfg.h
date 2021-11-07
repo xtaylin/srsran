@@ -117,6 +117,9 @@ public:
   const std::map<uint8_t, erab_t>&        get_erabs() const { return erabs; }
   const asn1::rrc::drb_to_add_mod_list_l& get_established_drbs() const { return current_drbs; }
 
+  int  add_drb(const asn1::rrc::drb_to_add_mod_s& drb);
+  int  release_drb(uint8_t drb_id);
+
   std::map<uint8_t, std::vector<uint8_t> > erab_info_list;
   std::map<uint8_t, erab_t>                erabs;
 

@@ -58,6 +58,7 @@ typedef struct {
   std::string gtpu_level;
   std::string s1ap_level;
   std::string stack_level;
+  std::string mitm_level;
 
   int mac_hex_limit;
   int rlc_hex_limit;
@@ -66,6 +67,7 @@ typedef struct {
   int gtpu_hex_limit;
   int s1ap_hex_limit;
   int stack_hex_limit;
+  int mitm_hex_limit;
 } stack_log_args_t;
 
 // Expert arguments to create GW without core NW
@@ -75,6 +77,13 @@ typedef struct {
   uint8_t          drb_lcid;
   uint16_t         rnti;
 } core_less_args_t;
+
+typedef struct {
+  std::string local_addr;
+  uint16_t    local_port;
+  std::string remote_addr;
+  uint16_t    remote_port;
+} mitm_args_t;
 
 typedef struct {
   std::string      type;
@@ -87,6 +96,7 @@ typedef struct {
   stack_log_args_t log;
   embms_args_t     embms;
   core_less_args_t coreless;
+  mitm_args_t      mitm;
 } stack_args_t;
 
 struct stack_metrics_t;

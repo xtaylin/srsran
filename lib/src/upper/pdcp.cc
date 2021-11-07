@@ -39,20 +39,25 @@ pdcp::~pdcp()
   pdcp_array_mrb.clear();
 }
 
-void pdcp::init(srsue::rlc_interface_pdcp* rlc_,
-                srsue::rrc_interface_pdcp* rrc_,
-                srsue::rrc_interface_pdcp* rrc_nr_,
-                srsue::gw_interface_pdcp*  gw_)
+void pdcp::init(srsue::rlc_interface_pdcp*  rlc_,
+                srsue::rrc_interface_pdcp*  rrc_,
+                srsue::rrc_interface_pdcp*  rrc_nr_,
+                srsue::gw_interface_pdcp*   gw_,
+                srsue::mitm_interface_pdcp* mitm_)
 {
-  init(rlc_, rrc_, gw_);
+  init(rlc_, rrc_, gw_, mitm_);
   rrc_nr = rrc_nr_;
 }
 
-void pdcp::init(srsue::rlc_interface_pdcp* rlc_, srsue::rrc_interface_pdcp* rrc_, srsue::gw_interface_pdcp* gw_)
+void pdcp::init(srsue::rlc_interface_pdcp*  rlc_,
+                srsue::rrc_interface_pdcp*  rrc_,
+                srsue::gw_interface_pdcp*   gw_,
+                srsue::mitm_interface_pdcp* mitm_)
 {
-  rlc = rlc_;
-  rrc = rrc_;
-  gw  = gw_;
+  rlc  = rlc_;
+  rrc  = rrc_;
+  gw   = gw_;
+  mitm = mitm_;
 }
 
 void pdcp::stop() {}
@@ -114,13 +119,13 @@ void pdcp::add_bearer(uint32_t lcid, pdcp_config_t cfg)
     std::unique_ptr<pdcp_entity_base> entity;
     // For now we create an pdcp entity lte for nr due to it's maturity
     if (cfg.rat == srsran::srsran_rat_t::lte) {
-      entity.reset(new pdcp_entity_lte{rlc, rrc, gw, task_sched, logger, lcid});
+      entity.reset(new pdcp_entity_lte{rlc, rrc, gw, mitm, task_sched, logger, lcid});
     } else if (cfg.rat == srsran::srsran_rat_t::nr) {
       if (rrc_nr == nullptr) {
         logger.warning("Cannot add PDCP entity - missing rrc_nr parent pointer");
         return;
       }
-      entity.reset(new pdcp_entity_lte{rlc, rrc_nr, gw, task_sched, logger, lcid});
+      entity.reset(new pdcp_entity_lte{rlc, rrc_nr, gw, mitm, task_sched, logger, lcid});
     }
 
     if (not entity->configure(cfg)) {
@@ -147,7 +152,7 @@ void pdcp::add_bearer_mrb(uint32_t lcid, pdcp_config_t cfg)
 {
   if (not valid_mch_lcid(lcid)) {
     std::unique_ptr<pdcp_entity_lte> entity;
-    entity.reset(new pdcp_entity_lte{rlc, rrc, gw, task_sched, logger, lcid});
+    entity.reset(new pdcp_entity_lte{rlc, rrc, gw, mitm, task_sched, logger, lcid});
     if (not entity->configure(cfg)) {
       logger.error("Can not configure PDCP entity");
       return;

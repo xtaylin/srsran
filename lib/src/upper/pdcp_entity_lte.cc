@@ -27,19 +27,22 @@
 #include "srsran/interfaces/ue_rlc_interfaces.h"
 #include <bitset>
 
+#include "srsran/interfaces/ue_mitm_interfaces.h"
+
 namespace srsran {
 
 /****************************************************************************
  * PDCP Entity LTE class
  ***************************************************************************/
 
-pdcp_entity_lte::pdcp_entity_lte(srsue::rlc_interface_pdcp* rlc_,
-                                 srsue::rrc_interface_pdcp* rrc_,
-                                 srsue::gw_interface_pdcp*  gw_,
-                                 srsran::task_sched_handle  task_sched_,
-                                 srslog::basic_logger&      logger,
-                                 uint32_t                   lcid_) :
-  pdcp_entity_base(task_sched_, logger), rlc(rlc_), rrc(rrc_), gw(gw_)
+pdcp_entity_lte::pdcp_entity_lte(srsue::rlc_interface_pdcp*  rlc_,
+                                 srsue::rrc_interface_pdcp*  rrc_,
+                                 srsue::gw_interface_pdcp*   gw_,
+                                 srsue::mitm_interface_pdcp* mitm_,
+                                 srsran::task_sched_handle   task_sched_,
+                                 srslog::basic_logger&       logger,
+                                 uint32_t                    lcid_) :
+  pdcp_entity_base(task_sched_, logger), rlc(rlc_), rrc(rrc_), gw(gw_), mitm(mitm_)
 {
   // Initial state
   integrity_direction  = DIRECTION_NONE;
@@ -171,16 +174,16 @@ void pdcp_entity_lte::write_sdu(unique_byte_buffer_t sdu, int upper_sn)
 
   write_data_header(sdu, tx_count);
 
-  // Append MAC (SRBs only)
-  uint8_t mac[4]       = {};
-  bool    do_integrity = integrity_direction == DIRECTION_TX || integrity_direction == DIRECTION_TXRX;
-  if (do_integrity && is_srb()) {
-    integrity_generate(sdu->msg, sdu->N_bytes, tx_count, mac);
-  }
+  // // Append MAC (SRBs only)
+  // uint8_t mac[4]       = {};
+  // bool    do_integrity = integrity_direction == DIRECTION_TX || integrity_direction == DIRECTION_TXRX;
+  // if (do_integrity && is_srb()) {
+  //   integrity_generate(sdu->msg, sdu->N_bytes, tx_count, mac);
+  // }
 
-  if (is_srb()) {
-    append_mac(sdu, mac);
-  }
+  // if (is_srb()) {
+  //   append_mac(sdu, mac);
+  // }
 
   if (encryption_direction == DIRECTION_TX || encryption_direction == DIRECTION_TXRX) {
     cipher_encrypt(
@@ -304,17 +307,17 @@ void pdcp_entity_lte::handle_srb_pdu(srsran::unique_byte_buffer_t pdu)
 
   logger.debug(pdu->msg, pdu->N_bytes, "%s Rx SDU SN=%d", rrc->get_rb_name(lcid), sn);
 
-  // Extract MAC
-  uint8_t mac[4];
-  extract_mac(pdu, mac);
+  // // Extract MAC
+  // uint8_t mac[4];
+  // extract_mac(pdu, mac);
 
-  // Perfrom integrity checks
-  if (integrity_direction == DIRECTION_RX || integrity_direction == DIRECTION_TXRX) {
-    if (not integrity_verify(pdu->msg, pdu->N_bytes, count, mac)) {
-      logger.error(pdu->msg, pdu->N_bytes, "%s Dropping PDU", rrc->get_rb_name(lcid));
-      return; // Discard
-    }
-  }
+  // // Perfrom integrity checks
+  // if (integrity_direction == DIRECTION_RX || integrity_direction == DIRECTION_TXRX) {
+  //   if (not integrity_verify(pdu->msg, pdu->N_bytes, count, mac)) {
+  //     logger.error(pdu->msg, pdu->N_bytes, "%s Dropping PDU", rrc->get_rb_name(lcid));
+  //     return; // Discard
+  //   }
+  // }
 
   // Discard header
   discard_data_header(pdu);
@@ -358,7 +361,7 @@ void pdcp_entity_lte::handle_um_drb_pdu(srsran::unique_byte_buffer_t pdu)
   }
 
   // Pass to upper layers
-  gw->write_pdu(lcid, std::move(pdu));
+  mitm->write_sdu(lcid, std::move(pdu));
 }
 
 // DRBs mapped on RLC AM, without re-ordering (5.1.2.1.2)
@@ -422,7 +425,7 @@ void pdcp_entity_lte::handle_am_drb_pdu(srsran::unique_byte_buffer_t pdu)
   update_rx_counts_queue(count);
 
   // Pass to upper layers
-  gw->write_pdu(lcid, std::move(pdu));
+  mitm->write_sdu(lcid, std::move(pdu));
 }
 
 void pdcp_entity_lte::update_rx_counts_queue(uint32_t rx_count)

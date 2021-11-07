@@ -45,6 +45,7 @@ ue_stack_lte::ue_stack_lte() :
   nas_logger(srslog::fetch_basic_logger("NAS", false)),
   mac_nr_logger(srslog::fetch_basic_logger("MAC-NR")),
   rrc_nr_logger(srslog::fetch_basic_logger("RRC-NR", false)),
+  mitm_logger(srslog::fetch_basic_logger("MITM", false)),
   mac_pcap(),
   mac_nr_pcap(),
   usim(nullptr),
@@ -123,6 +124,8 @@ int ue_stack_lte::init(const stack_args_t& args_)
   usim_logger.set_hex_dump_max_size(args.log.usim_hex_limit);
   nas_logger.set_level(srslog::str_to_basic_level(args.log.nas_level));
   nas_logger.set_hex_dump_max_size(args.log.nas_hex_limit);
+  mitm_logger.set_level(srslog::str_to_basic_level(args.log.mitm_level));
+  mitm_logger.set_hex_dump_max_size(args.log.mitm_hex_limit);
 
   mac_nr_logger.set_level(srslog::str_to_basic_level(args.log.mac_level));
   mac_nr_logger.set_hex_dump_max_size(args.log.mac_hex_limit);
@@ -211,13 +214,18 @@ int ue_stack_lte::init(const stack_args_t& args_)
 
   mac.init(phy, &rlc, &rrc);
   rlc.init(&pdcp, &rrc, &rrc_nr, task_sched.get_timer_handler(), 0 /* RB_ID_SRB0 */);
-  pdcp.init(&rlc, &rrc, &rrc_nr, gw);
+  pdcp.init(&rlc, &rrc, &rrc_nr, gw, &mitm);
   nas.init(usim.get(), &rrc, gw, args.nas);
 
   mac_nr_args_t mac_nr_args = {};
   mac_nr.init(mac_nr_args, phy_nr, &rlc, &rrc_nr);
   rrc_nr.init(phy_nr, &mac_nr, &rlc, &pdcp, gw, &rrc, usim.get(), task_sched.get_timer_handler(), nullptr, args.rrc_nr);
-  rrc.init(phy, &mac, &rlc, &pdcp, &nas, usim.get(), gw, &rrc_nr, args.rrc);
+  rrc.init(phy, &mac, &rlc, &pdcp, &nas, usim.get(), gw, &rrc_nr, &mitm, args.rrc);
+
+  if (mitm.init(args.mitm, &pdcp, &rrc) != SRSRAN_SUCCESS) {
+    stack_logger.error("Couldn't initialize MITM");
+    return SRSRAN_ERROR;
+  }
 
   running = true;
   start(STACK_MAIN_THREAD_PRIO);
@@ -244,6 +252,8 @@ void ue_stack_lte::stop_impl()
   rlc.stop();
   pdcp.stop();
   mac.stop();
+
+  mitm.stop();
 
   if (args.pkt_trace.mac_pcap.enable) {
     mac_pcap.close();

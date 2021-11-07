@@ -74,6 +74,13 @@ public:
   virtual bool start_service_request() = 0;
 };
 
+// PDCP interface for MITM
+class pdcp_interface_mitm
+{
+public:
+  virtual void write_sdu(uint32_t lcid, srsran::unique_byte_buffer_t sdu, int sn = -1) = 0;
+};
+
 } // namespace srsue
 
 #endif // SRSRAN_UE_PDCP_INTERFACES_H

@@ -78,7 +78,7 @@ int ue_stack_nr::init(const stack_args_t& args_)
   mac_nr_args_t mac_args = {};
   mac->init(mac_args, phy, rlc.get(), rrc.get());
   rlc->init(pdcp.get(), rrc.get(), task_sched.get_timer_handler(), 0 /* RB_ID_SRB0 */);
-  pdcp->init(rlc.get(), rrc.get(), gw);
+  pdcp->init(rlc.get(), rrc.get(), gw, nullptr);
 
   // TODO: where to put RRC args?
   rrc_nr_args_t rrc_args     = {};

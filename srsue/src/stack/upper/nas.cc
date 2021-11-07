@@ -478,15 +478,15 @@ void nas::write_pdu(uint32_t lcid, unique_byte_buffer_t pdu)
       break;
     case LIBLTE_MME_SECURITY_HDR_TYPE_INTEGRITY:
     case LIBLTE_MME_SECURITY_HDR_TYPE_INTEGRITY_AND_CIPHERED:
-      if ((integrity_check(pdu.get()))) {
-        if (sec_hdr_type == LIBLTE_MME_SECURITY_HDR_TYPE_INTEGRITY_AND_CIPHERED) {
-          cipher_decrypt(pdu.get());
-        }
-        break;
-      } else {
-        logger.error("Not handling NAS message with integrity check error");
-        return;
-      }
+      // if ((integrity_check(pdu.get()))) {
+      //   if (sec_hdr_type == LIBLTE_MME_SECURITY_HDR_TYPE_INTEGRITY_AND_CIPHERED) {
+      //     cipher_decrypt(pdu.get());
+      //   }
+      //   break;
+      // } else {
+      //   logger.error("Not handling NAS message with integrity check error");
+      //   return;
+      // }
     case LIBLTE_MME_SECURITY_HDR_TYPE_INTEGRITY_AND_CIPHERED_WITH_NEW_EPS_SECURITY_CONTEXT:
       break;
     default:
@@ -536,57 +536,72 @@ void nas::write_pdu(uint32_t lcid, unique_byte_buffer_t pdu)
 
   switch (msg_type) {
     case LIBLTE_MME_MSG_TYPE_ATTACH_ACCEPT:
-      parse_attach_accept(lcid, std::move(pdu));
+      // parse_attach_accept(lcid, std::move(pdu));
+      {
+        // stop T3410
+        if (t3410.is_running()) {
+          logger.debug("Stopping T3410");
+          t3410.stop();
+        }
+
+        // bearer added successfully
+        attach_attempt_counter = 0; // reset according to 5.5.1.1
+        state.set_registered(emm_state_t::registered_substate_t::normal_service);
+      }
       break;
     case LIBLTE_MME_MSG_TYPE_ATTACH_REJECT:
-      parse_attach_reject(lcid, std::move(pdu));
+      // parse_attach_reject(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_AUTHENTICATION_REQUEST:
-      parse_authentication_request(lcid, std::move(pdu), sec_hdr_type);
+      // parse_authentication_request(lcid, std::move(pdu), sec_hdr_type);
       break;
     case LIBLTE_MME_MSG_TYPE_AUTHENTICATION_REJECT:
-      parse_authentication_reject(lcid, std::move(pdu));
+      // parse_authentication_reject(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_IDENTITY_REQUEST:
-      parse_identity_request(std::move(pdu), sec_hdr_type);
+      // parse_identity_request(std::move(pdu), sec_hdr_type);
       break;
     case LIBLTE_MME_MSG_TYPE_SECURITY_MODE_COMMAND:
-      parse_security_mode_command(lcid, std::move(pdu));
+      // parse_security_mode_command(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_SERVICE_REJECT:
-      parse_service_reject(lcid, std::move(pdu));
+      // parse_service_reject(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_ESM_INFORMATION_REQUEST:
-      parse_esm_information_request(lcid, std::move(pdu));
+      // parse_esm_information_request(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_EMM_INFORMATION:
-      parse_emm_information(lcid, std::move(pdu));
+      // parse_emm_information(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_EMM_STATUS:
-      parse_emm_status(lcid, std::move(pdu));
+      // parse_emm_status(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_DETACH_REQUEST:
-      parse_detach_request(lcid, std::move(pdu));
+      // parse_detach_request(lcid, std::move(pdu));
+      {
+        // TODO: add parsing and correct handling of EMM cause for detach (Sec. 5.5.2.3.2)
+        enter_emm_deregistered(emm_state_t::deregistered_substate_t::null);
+      }
       break;
     case LIBLTE_MME_MSG_TYPE_ACTIVATE_DEDICATED_EPS_BEARER_CONTEXT_REQUEST:
-      parse_activate_dedicated_eps_bearer_context_request(lcid, std::move(pdu));
+      // parse_activate_dedicated_eps_bearer_context_request(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_DEACTIVATE_EPS_BEARER_CONTEXT_REQUEST:
-      parse_deactivate_eps_bearer_context_request(std::move(pdu));
+      // parse_deactivate_eps_bearer_context_request(std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_MODIFY_EPS_BEARER_CONTEXT_REQUEST:
-      parse_modify_eps_bearer_context_request(std::move(pdu));
+      // parse_modify_eps_bearer_context_request(std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_ACTIVATE_TEST_MODE:
-      parse_activate_test_mode(lcid, std::move(pdu));
+      // parse_activate_test_mode(lcid, std::move(pdu));
       break;
     case LIBLTE_MME_MSG_TYPE_CLOSE_UE_TEST_LOOP:
-      parse_close_ue_test_loop(lcid, std::move(pdu));
+      // parse_close_ue_test_loop(lcid, std::move(pdu));
       break;
     // TODO: Handle deactivate test mode and ue open test loop
     case LIBLTE_MME_MSG_TYPE_OPEN_UE_TEST_LOOP:
     case LIBLTE_MME_MSG_TYPE_DEACTIVATE_TEST_MODE:
-      gw->set_test_loop_mode(gw_interface_nas::TEST_LOOP_INACTIVE);
+      // gw->set_test_loop_mode(gw_interface_nas::TEST_LOOP_INACTIVE);
       break;
     default:
       logger.error("Not handling NAS message with MSG_TYPE=%02X", msg_type);

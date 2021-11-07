@@ -174,6 +174,8 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
     ("log.usim_hex_limit", bpo::value<int>(&args->stack.log.usim_hex_limit), "USIM log hex dump limit")
     ("log.stack_level", bpo::value<string>(&args->stack.log.stack_level), "Stack log level")
     ("log.stack_hex_limit", bpo::value<int>(&args->stack.log.stack_hex_limit), "Stack log hex dump limit")
+    ("log.mitm_level", bpo::value<string>(&args->stack.log.mitm_level), "MITM log level")
+    ("log.mitm_hex_limit", bpo::value<int>(&args->stack.log.mitm_hex_limit), "MITM log hex dump limit")
 
     ("log.all_level", bpo::value<string>(&args->log.all_level)->default_value("info"), "ALL log level")
     ("log.all_hex_limit", bpo::value<int>(&args->log.all_hex_limit)->default_value(32), "ALL log hex dump limit")
@@ -457,6 +459,12 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
     ("vnf.type", bpo::value<string>(&args->phy.vnf_args.type)->default_value("ue"), "VNF instance type [gnb,ue]")
     ("vnf.addr", bpo::value<string>(&args->phy.vnf_args.bind_addr)->default_value("localhost"), "Address to bind VNF interface")
     ("vnf.port", bpo::value<uint16_t>(&args->phy.vnf_args.bind_port)->default_value(3334), "Bind port")
+
+    // MITM section
+    ("mitm.local_addr", bpo::value<string>(&args->stack.mitm.local_addr)->default_value("127.0.0.1"), "Local address for MITM connection")
+    ("mitm.local_port", bpo::value<uint16_t>(&args->stack.mitm.local_port)->default_value(36865), "Local port for MITM connection")
+    ("mitm.remote_addr", bpo::value<string>(&args->stack.mitm.remote_addr)->default_value("127.0.0.1"), "Remote address for MITM connection")
+    ("mitm.remote_port", bpo::value<uint16_t>(&args->stack.mitm.remote_port)->default_value(36864), "Remote port for MITM connection")
     ;
 
   // Positional options - config file location
@@ -562,6 +570,9 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
     if (!vm.count("log.stack_level")) {
       args->stack.log.stack_level = args->log.all_level;
     }
+    if (!vm.count("log.mitm_level")) {
+      args->stack.log.mitm_level = args->log.all_level;
+    }
   }
 
   // Apply all_hex_limit to any unset layers
@@ -592,6 +603,9 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
     }
     if (!vm.count("log.stack_hex_limit")) {
       args->stack.log.stack_hex_limit = args->log.all_hex_limit;
+    }
+    if (!vm.count("log.mitm_hex_limit")) {
+      args->stack.log.mitm_hex_limit = args->log.all_hex_limit;
     }
   }
 
@@ -711,8 +725,8 @@ int main(int argc, char* argv[])
   pthread_t input;
   pthread_create(&input, nullptr, &input_loop, &args);
 
-  cout << "Attaching UE..." << endl;
-  ue.switch_on();
+  // cout << "Attaching UE..." << endl;
+  // ue.switch_on();
 
   if (args.gui.enable) {
     ue.start_plot();
@@ -722,7 +736,8 @@ int main(int argc, char* argv[])
     sleep(1);
   }
 
-  ue.switch_off();
+  // ue.switch_off();
+
   pthread_cancel(input);
   pthread_join(input, nullptr);
   metricshub.stop();

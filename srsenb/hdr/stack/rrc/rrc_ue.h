@@ -87,6 +87,7 @@ public:
   void send_ue_info_req();
 
   void parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t pdu);
+  void parse_dl_dcch(uint32_t lcid, srsran::unique_byte_buffer_t& pdu);
 
   /// List of generated RRC events.
   enum class rrc_event_type {
@@ -250,6 +251,8 @@ private:
   void apply_pdcp_srb_updates(const asn1::rrc::rr_cfg_ded_s& pending_rr_cfg);
   void apply_pdcp_drb_updates(const asn1::rrc::rr_cfg_ded_s& pending_rr_cfg);
   void apply_rlc_rb_updates(const asn1::rrc::rr_cfg_ded_s& pending_rr_cfg);
+
+  void handle_rrc_con_reconfig(const asn1::rrc::rrc_conn_recfg_s& msg);
 }; // class ue
 
 } // namespace srsenb

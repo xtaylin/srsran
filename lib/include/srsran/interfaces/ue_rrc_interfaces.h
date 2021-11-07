@@ -121,6 +121,12 @@ public:
   virtual bool is_config_pending()                                               = 0;
 };
 
+class rrc_interface_mitm
+{
+public:
+  virtual void parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t& pdu) = 0;
+};
+
 } // namespace srsue
 
 #endif // SRSRAN_UE_RRC_INTERFACES_H

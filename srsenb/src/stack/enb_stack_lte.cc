@@ -39,6 +39,7 @@ enb_stack_lte::enb_stack_lte(srslog::sink& log_sink) :
   s1ap_logger(srslog::fetch_basic_logger("S1AP", log_sink, false)),
   gtpu_logger(srslog::fetch_basic_logger("GTPU", log_sink, false)),
   stack_logger(srslog::fetch_basic_logger("STCK", log_sink, false)),
+  mitm_logger(srslog::fetch_basic_logger("MITM", log_sink, false)),
   task_sched(512, 128),
   pdcp(&task_sched, pdcp_logger),
   mac(&task_sched, mac_logger),
@@ -97,6 +98,7 @@ int enb_stack_lte::init(const stack_args_t& args_, const rrc_cfg_t& rrc_cfg_)
   gtpu_logger.set_level(srslog::str_to_basic_level(args.log.gtpu_level));
   s1ap_logger.set_level(srslog::str_to_basic_level(args.log.s1ap_level));
   stack_logger.set_level(srslog::str_to_basic_level(args.log.stack_level));
+  mitm_logger.set_level(srslog::str_to_basic_level(args.log.mitm_level));
 
   rlc_logger.set_hex_dump_max_size(args.log.rlc_hex_limit);
   pdcp_logger.set_hex_dump_max_size(args.log.pdcp_hex_limit);
@@ -104,6 +106,7 @@ int enb_stack_lte::init(const stack_args_t& args_, const rrc_cfg_t& rrc_cfg_)
   gtpu_logger.set_hex_dump_max_size(args.log.gtpu_hex_limit);
   s1ap_logger.set_hex_dump_max_size(args.log.s1ap_hex_limit);
   stack_logger.set_hex_dump_max_size(args.log.stack_hex_limit);
+  mitm_logger.set_hex_dump_max_size(args.log.mitm_hex_limit);
 
   // Set up pcap and trace
   if (args.mac_pcap.enable) {
@@ -133,15 +136,15 @@ int enb_stack_lte::init(const stack_args_t& args_, const rrc_cfg_t& rrc_cfg_)
     return SRSRAN_ERROR;
   }
   rlc.init(&pdcp, &rrc, &mac, task_sched.get_timer_handler());
-  pdcp.init(&rlc, &rrc, &gtpu);
-  if (rrc.init(rrc_cfg, phy, &mac, &rlc, &pdcp, &s1ap, &gtpu) != SRSRAN_SUCCESS) {
+  pdcp.init(&rlc, &rrc, &gtpu, &mitm);
+  if (rrc.init(rrc_cfg, phy, &mac, &rlc, &pdcp, &s1ap, &gtpu, &mitm) != SRSRAN_SUCCESS) {
     stack_logger.error("Couldn't initialize RRC");
     return SRSRAN_ERROR;
   }
-  if (s1ap.init(args.s1ap, &rrc) != SRSRAN_SUCCESS) {
-    stack_logger.error("Couldn't initialize S1AP");
-    return SRSRAN_ERROR;
-  }
+  // if (s1ap.init(args.s1ap, &rrc) != SRSRAN_SUCCESS) {
+  //   stack_logger.error("Couldn't initialize S1AP");
+  //   return SRSRAN_ERROR;
+  // }
   if (gtpu.init(args.s1ap.gtp_bind_addr,
                 args.s1ap.mme_addr,
                 args.embms.m1u_multiaddr,
@@ -149,6 +152,10 @@ int enb_stack_lte::init(const stack_args_t& args_, const rrc_cfg_t& rrc_cfg_)
                 &pdcp,
                 args.embms.enable)) {
     stack_logger.error("Couldn't initialize GTPU");
+    return SRSRAN_ERROR;
+  }
+  if (mitm.init(args.mitm, &pdcp, &rrc) != SRSRAN_SUCCESS) {
+    stack_logger.error("Couldn't initialize MITM");
     return SRSRAN_ERROR;
   }
 
@@ -182,12 +189,13 @@ void enb_stack_lte::stop_impl()
 {
   rx_sockets.stop();
 
-  s1ap.stop();
+  // s1ap.stop();
   gtpu.stop();
   mac.stop();
   rlc.stop();
   pdcp.stop();
   rrc.stop();
+  mitm.stop();
 
   if (args.mac_pcap.enable) {
     mac_pcap.close();

@@ -49,7 +49,8 @@ int32_t rrc::init(const rrc_cfg_t&       cfg_,
                   rlc_interface_rrc*     rlc_,
                   pdcp_interface_rrc*    pdcp_,
                   s1ap_interface_rrc*    s1ap_,
-                  gtpu_interface_rrc*    gtpu_)
+                  gtpu_interface_rrc*    gtpu_,
+                  mitm_interface_rrc*    mitm_)
 {
   phy  = phy_;
   mac  = mac_;
@@ -57,6 +58,7 @@ int32_t rrc::init(const rrc_cfg_t&       cfg_,
   pdcp = pdcp_;
   gtpu = gtpu_;
   s1ap = s1ap_;
+  mitm = mitm_;
 
   cfg = cfg_;
 
@@ -658,6 +660,19 @@ void rrc::parse_ul_dcch(uint16_t rnti, uint32_t lcid, srsran::unique_byte_buffer
     auto user_it = users.find(rnti);
     if (user_it != users.end()) {
       user_it->second->parse_ul_dcch(lcid, std::move(pdu));
+    } else {
+      logger.error("Processing %s: Unknown rnti=0x%x", get_rb_name(lcid), rnti);
+    }
+  }
+}
+
+///< User mutex must be hold by caller
+void rrc::parse_dl_dcch(uint16_t rnti, uint32_t lcid, srsran::unique_byte_buffer_t& pdu)
+{
+  if (pdu) {
+    auto user_it = users.find(rnti);
+    if (user_it != users.end()) {
+      user_it->second->parse_dl_dcch(lcid, pdu);
     } else {
       logger.error("Processing %s: Unknown rnti=0x%x", get_rb_name(lcid), rnti);
     }

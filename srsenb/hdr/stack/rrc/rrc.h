@@ -44,6 +44,7 @@ class pdcp_interface_rrc;
 class rlc_interface_rrc;
 class mac_interface_rrc;
 class phy_interface_rrc_lte;
+class mitm_interface_rrc;
 
 static const char rrc_state_text[RRC_STATE_N_ITEMS][100] = {"IDLE",
                                                             "WAIT FOR CON SETUP COMPLETE",
@@ -56,7 +57,8 @@ static const char rrc_state_text[RRC_STATE_N_ITEMS][100] = {"IDLE",
 class rrc final : public rrc_interface_pdcp,
                   public rrc_interface_mac,
                   public rrc_interface_rlc,
-                  public rrc_interface_s1ap
+                  public rrc_interface_s1ap,
+                  public rrc_interface_mitm
 {
 public:
   explicit rrc(srsran::task_sched_handle task_sched_);
@@ -68,7 +70,8 @@ public:
                rlc_interface_rrc*     rlc,
                pdcp_interface_rrc*    pdcp,
                s1ap_interface_rrc*    s1ap,
-               gtpu_interface_rrc*    gtpu);
+               gtpu_interface_rrc*    gtpu,
+               mitm_interface_rrc*    mitm);
 
   void stop();
   void get_metrics(rrc_metrics_t& m);
@@ -124,6 +127,9 @@ public:
   // rrc_interface_pdcp
   void write_pdu(uint16_t rnti, uint32_t lcid, srsran::unique_byte_buffer_t pdu) override;
 
+  // rrc_interface_mitm
+  void parse_dl_dcch(uint16_t rnti, uint32_t lcid, srsran::unique_byte_buffer_t& pdu) override;
+
   uint32_t get_nof_users();
 
   // logging
@@ -166,6 +172,7 @@ private:
   pdcp_interface_rrc*       pdcp = nullptr;
   gtpu_interface_rrc*       gtpu = nullptr;
   s1ap_interface_rrc*       s1ap = nullptr;
+  mitm_interface_rrc*       mitm = nullptr;
   srslog::basic_logger&     logger;
 
   // derived params

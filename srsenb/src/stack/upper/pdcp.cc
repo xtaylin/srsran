@@ -25,17 +25,23 @@
 #include "srsran/interfaces/enb_rlc_interfaces.h"
 #include "srsran/interfaces/enb_rrc_interfaces.h"
 
+#include "srsran/interfaces/enb_mitm_interfaces.h"
+
 namespace srsenb {
 
 pdcp::pdcp(srsran::task_sched_handle task_sched_, srslog::basic_logger& logger_) :
   task_sched(task_sched_), logger(logger_)
 {}
 
-void pdcp::init(rlc_interface_pdcp* rlc_, rrc_interface_pdcp* rrc_, gtpu_interface_pdcp* gtpu_)
+void pdcp::init(rlc_interface_pdcp*  rlc_,
+                rrc_interface_pdcp*  rrc_,
+                gtpu_interface_pdcp* gtpu_,
+                mitm_interface_pdcp* mitm_)
 {
   rlc  = rlc_;
   rrc  = rrc_;
   gtpu = gtpu_;
+  mitm = mitm_;
 }
 
 void pdcp::stop()
@@ -50,14 +56,16 @@ void pdcp::add_user(uint16_t rnti)
 {
   if (users.count(rnti) == 0) {
     unique_rnti_ptr<srsran::pdcp> obj = make_rnti_obj<srsran::pdcp>(rnti, task_sched, logger.id().c_str());
-    obj->init(&users[rnti].rlc_itf, &users[rnti].rrc_itf, &users[rnti].gtpu_itf);
+    obj->init(&users[rnti].rlc_itf, &users[rnti].rrc_itf, &users[rnti].gtpu_itf, &users[rnti].mitm_itf);
     users[rnti].rlc_itf.rnti  = rnti;
     users[rnti].gtpu_itf.rnti = rnti;
     users[rnti].rrc_itf.rnti  = rnti;
+    users[rnti].mitm_itf.rnti = rnti;
 
     users[rnti].rrc_itf.rrc   = rrc;
     users[rnti].rlc_itf.rlc   = rlc;
     users[rnti].gtpu_itf.gtpu = gtpu;
+    users[rnti].mitm_itf.mitm = mitm;
     users[rnti].pdcp          = std::move(obj);
   }
 }
@@ -247,6 +255,11 @@ void pdcp::user_interface_rrc::write_pdu_pcch(srsran::unique_byte_buffer_t pdu)
 const char* pdcp::user_interface_rrc::get_rb_name(uint32_t lcid)
 {
   return srsenb::get_rb_name(lcid);
+}
+
+void pdcp::user_interface_mitm::write_sdu(uint32_t lcid, srsran::unique_byte_buffer_t sdu)
+{
+  mitm->write_sdu(rnti, lcid, std::move(sdu));
 }
 
 void pdcp::get_metrics(pdcp_metrics_t& m, const uint32_t nof_tti)

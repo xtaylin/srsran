@@ -456,4 +456,31 @@ void bearer_cfg_handler::fill_pending_nas_info(asn1::rrc::rrc_conn_recfg_r8_ies_
   }
 }
 
+int bearer_cfg_handler::add_drb(const asn1::rrc::drb_to_add_mod_s& drb)
+{
+  // Set DRBtoAddMod
+  auto drb_it                                              = srsran::add_rrc_obj_id(current_drbs, drb.drb_id);
+  drb_it->lc_ch_id_present                                 = drb.lc_ch_id_present;
+  drb_it->lc_ch_id                                         = drb.lc_ch_id;
+  drb_it->eps_bearer_id_present                            = drb.eps_bearer_id_present;
+  drb_it->eps_bearer_id                                    = drb.eps_bearer_id;
+  drb_it->lc_ch_cfg_present                                = drb.lc_ch_cfg_present;
+  drb_it->lc_ch_cfg.ul_specific_params_present             = drb.lc_ch_cfg.ul_specific_params_present;
+  drb_it->lc_ch_cfg.ul_specific_params.lc_ch_group_present = drb.lc_ch_cfg.ul_specific_params.lc_ch_group_present;
+  drb_it->lc_ch_cfg.ul_specific_params                     = drb.lc_ch_cfg.ul_specific_params;
+  drb_it->pdcp_cfg_present                                 = drb.pdcp_cfg_present;
+  drb_it->pdcp_cfg                                         = drb.pdcp_cfg;
+  drb_it->rlc_cfg_present                                  = drb.rlc_cfg_present;
+  drb_it->rlc_cfg                                          = drb.rlc_cfg;
+
+  return SRSRAN_SUCCESS;
+}
+
+int bearer_cfg_handler::release_drb(uint8_t drb_id)
+{
+  srsran::rem_rrc_obj_id(current_drbs, drb_id);
+
+  return SRSRAN_SUCCESS;
+}
+
 } // namespace srsenb

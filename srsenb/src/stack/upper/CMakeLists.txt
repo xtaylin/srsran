@@ -18,7 +18,7 @@
 # and at http://www.gnu.org/licenses/.
 #
 
-set(SOURCES gtpu.cc pdcp.cc rlc.cc s1ap.cc)
+set(SOURCES gtpu.cc pdcp.cc rlc.cc s1ap.cc mitm.cc)
 add_library(srsenb_upper STATIC ${SOURCES})
 
 set(SOURCES pdcp_nr.cc rlc_nr.cc sdap.cc)

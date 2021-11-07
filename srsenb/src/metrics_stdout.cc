@@ -80,7 +80,6 @@ void metrics_stdout::set_metrics(const enb_metrics_t& metrics, const uint32_t pe
     return;
   }
 
-  // always print RF error
   if (metrics.rf.rf_error) {
     printf("RF status: O=%d, U=%d, L=%d\n", metrics.rf.rf_o, metrics.rf.rf_u, metrics.rf.rf_l);
   }

@@ -30,16 +30,20 @@
 
 namespace srsran {
 
-class pdcp : public srsue::pdcp_interface_rlc, public srsue::pdcp_interface_rrc
+class pdcp : public srsue::pdcp_interface_rlc, public srsue::pdcp_interface_rrc, public srsue::pdcp_interface_mitm
 {
 public:
   pdcp(srsran::task_sched_handle task_sched_, const char* logname);
   virtual ~pdcp();
-  void init(srsue::rlc_interface_pdcp* rlc_,
-            srsue::rrc_interface_pdcp* rrc_,
-            srsue::rrc_interface_pdcp* rrc_nr_,
-            srsue::gw_interface_pdcp*  gw_);
-  void init(srsue::rlc_interface_pdcp* rlc_, srsue::rrc_interface_pdcp* rrc_, srsue::gw_interface_pdcp* gw_);
+  void init(srsue::rlc_interface_pdcp*  rlc_,
+            srsue::rrc_interface_pdcp*  rrc_,
+            srsue::rrc_interface_pdcp*  rrc_nr_,
+            srsue::gw_interface_pdcp*   gw_,
+            srsue::mitm_interface_pdcp* mitm_);
+  void init(srsue::rlc_interface_pdcp*  rlc_,
+            srsue::rrc_interface_pdcp*  rrc_,
+            srsue::gw_interface_pdcp*   gw_,
+            srsue::mitm_interface_pdcp* mitm_);
   void stop();
 
   // GW interface
@@ -82,12 +86,13 @@ public:
   void reset_metrics();
 
 private:
-  srsue::rlc_interface_pdcp* rlc    = nullptr;
-  srsue::rrc_interface_pdcp* rrc    = nullptr;
-  srsue::rrc_interface_pdcp* rrc_nr = nullptr;
-  srsue::gw_interface_pdcp*  gw     = nullptr;
-  srsran::task_sched_handle  task_sched;
-  srslog::basic_logger&      logger;
+  srsue::rlc_interface_pdcp*  rlc    = nullptr;
+  srsue::rrc_interface_pdcp*  rrc    = nullptr;
+  srsue::rrc_interface_pdcp*  rrc_nr = nullptr;
+  srsue::gw_interface_pdcp*   gw     = nullptr;
+  srsue::mitm_interface_pdcp* mitm   = nullptr;
+  srsran::task_sched_handle   task_sched;
+  srslog::basic_logger&       logger;
 
   using pdcp_map_t = std::map<uint16_t, std::unique_ptr<pdcp_entity_base> >;
   pdcp_map_t pdcp_array, pdcp_array_mrb;

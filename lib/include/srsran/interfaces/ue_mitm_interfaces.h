@@ -19,36 +19,25 @@
  *
  */
 
-/******************************************************************************
- * File:        interfaces.h
- * Description: Abstract base class interfaces provided by layers
- *              to other layers.
- *****************************************************************************/
+#ifndef SRSRAN_UE_MITM_INTERFACES_H
+#define SRSRAN_UE_MITM_INTERFACES_H
 
-#ifndef SRSRAN_UE_INTERFACES_H
-#define SRSRAN_UE_INTERFACES_H
-
-#include "ue_mac_interfaces.h"
-#include "ue_rrc_interfaces.h"
+#include "srsran/common/byte_buffer.h"
 
 namespace srsue {
 
-// STACK interface for RRC
-class stack_interface_rrc
+class mitm_interface_pdcp
 {
 public:
-  virtual srsran::tti_point get_current_tti() = 0;
-  virtual bool              switch_on()       = 0;
+  virtual void write_sdu(uint32_t lcid, srsran::unique_byte_buffer_t sdu) = 0;
 };
 
-// Combined interface for PHY to access stack (MAC and RRC)
-class stack_interface_phy_lte : public mac_interface_phy_lte, public rrc_interface_phy_lte
+class mitm_interface_rrc
 {
 public:
-  /* Indicate new TTI */
-  virtual void run_tti(const uint32_t tti, const uint32_t tti_jump) = 0;
+  virtual void write_sdu(uint32_t lcid, srsran::unique_byte_buffer_t sdu) = 0;
 };
 
 } // namespace srsue
 
-#endif // SRSRAN_UE_INTERFACES_H
+#endif // SRSRAN_UE_MITM_INTERFACES_H

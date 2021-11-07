@@ -60,7 +60,7 @@ void pdcp_nr::add_user(uint16_t rnti)
     users[rnti].rlc_itf.rlc   = m_rlc;
     users[rnti].rrc_itf.rrc   = m_rrc;
     users[rnti].sdap_itf.sdap = m_sdap;
-    users[rnti].pdcp->init(&users[rnti].rlc_itf, &users[rnti].rrc_itf, &users[rnti].sdap_itf);
+    users[rnti].pdcp->init(&users[rnti].rlc_itf, &users[rnti].rrc_itf, &users[rnti].sdap_itf, nullptr);
   }
 }
 

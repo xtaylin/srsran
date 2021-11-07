@@ -40,6 +40,8 @@
 #include "srsran/interfaces/enb_interfaces.h"
 #include "srsran/srslog/srslog.h"
 
+#include "upper/mitm.h"
+
 namespace srsenb {
 
 class enb_stack_lte final : public enb_stack_base, public stack_interface_phy_lte, public srsran::thread
@@ -122,6 +124,7 @@ private:
   srslog::basic_logger& s1ap_logger;
   srslog::basic_logger& gtpu_logger;
   srslog::basic_logger& stack_logger;
+  srslog::basic_logger& mitm_logger;
 
   // PCAP and trace option
   srsran::mac_pcap     mac_pcap;
@@ -138,6 +141,7 @@ private:
   srsenb::rrc  rrc;
   srsenb::gtpu gtpu;
   srsenb::s1ap s1ap;
+  srsenb::mitm mitm;
 
   // RAT-specific interfaces
   phy_interface_stack_lte* phy = nullptr;

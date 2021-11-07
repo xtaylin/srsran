@@ -127,6 +127,13 @@ public:
   virtual void write_pdu(uint16_t rnti, uint32_t lcid, srsran::unique_byte_buffer_t pdu) = 0;
 };
 
+/// RRC interface for MITM
+class rrc_interface_mitm
+{
+public:
+  virtual void parse_dl_dcch(uint16_t rnti, uint32_t lcid, srsran::unique_byte_buffer_t& pdu) = 0;
+};
+
 } // namespace srsenb
 
 #endif // SRSRAN_ENB_RRC_INTERFACES_H

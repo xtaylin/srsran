@@ -41,6 +41,8 @@
 #include <numeric>
 #include <string.h>
 
+#include "srsran/interfaces/ue_mitm_interfaces.h"
+
 bool simulate_rlf = false;
 
 using namespace srsran;
@@ -114,6 +116,7 @@ void rrc::init(phy_interface_rrc_lte* phy_,
                usim_interface_rrc*    usim_,
                gw_interface_rrc*      gw_,
                rrc_nr_interface_rrc*  rrc_nr_,
+               mitm_interface_rrc*    mitm_,
                const rrc_args_t&      args_)
 {
   phy    = phy_;
@@ -124,6 +127,7 @@ void rrc::init(phy_interface_rrc_lte* phy_,
   usim   = usim_;
   gw     = gw_;
   rrc_nr = rrc_nr_;
+  mitm   = mitm_;
   args   = args_;
 
   auto on_every_cell_selection = [this](uint32_t earfcn, uint32_t pci, bool csel_result) {
@@ -1694,6 +1698,8 @@ void rrc::parse_dl_ccch(unique_byte_buffer_t pdu)
 
 void rrc::parse_dl_dcch(uint32_t lcid, unique_byte_buffer_t pdu)
 {
+  pdu->N_bytes -= sizeof(uint32_t); // MAC-I
+
   asn1::cbit_ref           bref(pdu->msg, pdu->N_bytes);
   asn1::rrc::dl_dcch_msg_s dl_dcch_msg;
   if (dl_dcch_msg.unpack(bref) != asn1::SRSASN_SUCCESS or
@@ -1705,18 +1711,19 @@ void rrc::parse_dl_dcch(uint32_t lcid, unique_byte_buffer_t pdu)
 
   dl_dcch_msg_type_c::c1_c_* c1 = &dl_dcch_msg.msg.c1();
   switch (dl_dcch_msg.msg.c1().type().value) {
-    case dl_dcch_msg_type_c::c1_c_::types::dl_info_transfer:
-      pdu = srsran::make_byte_buffer();
-      if (pdu == nullptr) {
+    case dl_dcch_msg_type_c::c1_c_::types::dl_info_transfer: {
+      unique_byte_buffer_t nas_pdu = srsran::make_byte_buffer();
+      if (nas_pdu == nullptr) {
         logger.error("Couldn't allocate PDU in %s().", __FUNCTION__);
         return;
       }
-      pdu->N_bytes = c1->dl_info_transfer().crit_exts.c1().dl_info_transfer_r8().ded_info_type.ded_info_nas().size();
-      memcpy(pdu->msg,
+      nas_pdu->N_bytes =
+          c1->dl_info_transfer().crit_exts.c1().dl_info_transfer_r8().ded_info_type.ded_info_nas().size();
+      memcpy(nas_pdu->msg,
              c1->dl_info_transfer().crit_exts.c1().dl_info_transfer_r8().ded_info_type.ded_info_nas().data(),
-             pdu->N_bytes);
-      nas->write_pdu(lcid, std::move(pdu));
-      break;
+             nas_pdu->N_bytes);
+      nas->write_pdu(lcid, std::move(nas_pdu));
+    } break;
     case dl_dcch_msg_type_c::c1_c_::types::security_mode_cmd:
       transaction_id = c1->security_mode_cmd().rrc_transaction_id;
 
@@ -1733,14 +1740,14 @@ void rrc::parse_dl_dcch(uint32_t lcid, unique_byte_buffer_t pdu)
                   ciphering_algorithm_id_text[sec_cfg.cipher_algo],
                   integrity_algorithm_id_text[sec_cfg.integ_algo]);
 
-      // Generate AS security keys
-      generate_as_keys();
-      security_is_activated = true;
+      // // Generate AS security keys
+      // generate_as_keys();
+      // security_is_activated = true;
 
       // Configure PDCP for security
       pdcp->config_security(lcid, sec_cfg);
       pdcp->enable_integrity(lcid, DIRECTION_TXRX);
-      send_security_mode_complete();
+      // send_security_mode_complete();
       pdcp->enable_encryption(lcid, DIRECTION_TXRX);
       break;
     case dl_dcch_msg_type_c::c1_c_::types::rrc_conn_recfg: {
@@ -1751,7 +1758,7 @@ void rrc::parse_dl_dcch(uint32_t lcid, unique_byte_buffer_t pdu)
     }
     case dl_dcch_msg_type_c::c1_c_::types::ue_cap_enquiry:
       transaction_id = c1->ue_cap_enquiry().rrc_transaction_id;
-      handle_ue_capability_enquiry(c1->ue_cap_enquiry());
+      // handle_ue_capability_enquiry(c1->ue_cap_enquiry());
       break;
     case dl_dcch_msg_type_c::c1_c_::types::rrc_conn_release:
       rrc_connection_release(c1->rrc_conn_release().crit_exts.c1().rrc_conn_release_r8().release_cause.to_string());
@@ -1759,6 +1766,57 @@ void rrc::parse_dl_dcch(uint32_t lcid, unique_byte_buffer_t pdu)
     default:
       logger.error("The provided DL-CCCH message type is not recognized or supported");
       break;
+  }
+
+  if (pdu != nullptr) {
+    pdu->N_bytes += sizeof(uint32_t); // MAC-I
+    mitm->write_sdu(lcid, std::move(pdu));
+  }
+}
+
+void rrc::parse_ul_dcch(uint32_t lcid, unique_byte_buffer_t& pdu)
+{
+  pdu->N_bytes -= sizeof(uint32_t); // MAC-I
+
+  asn1::cbit_ref           bref(pdu->msg, pdu->N_bytes);
+  asn1::rrc::ul_dcch_msg_s ul_dcch_msg;
+  if (ul_dcch_msg.unpack(bref) != asn1::SRSASN_SUCCESS or
+      ul_dcch_msg.msg.type().value != ul_dcch_msg_type_c::types_opts::c1) {
+    logger.error(pdu->msg, pdu->N_bytes, "Failed to unpack UL-DCCH message (%d B)", pdu->N_bytes);
+    return;
+  }
+  log_rrc_message(get_rb_name(lcid), Rx, pdu.get(), ul_dcch_msg, ul_dcch_msg.msg.c1().type().to_string());
+
+  ul_dcch_msg_type_c::c1_c_* c1 = &ul_dcch_msg.msg.c1();
+  switch (ul_dcch_msg.msg.c1().type().value) {
+    case ul_dcch_msg_type_c::c1_c_::types::rrc_conn_setup_complete: {
+      pdu->N_bytes += sizeof(uint32_t); // MAC-I
+      dedicated_info_rrc = std::move(pdu);
+      stack->switch_on();
+    } break;
+    case ul_dcch_msg_type_c::c1_c_::types::rrc_conn_reest_complete:
+      break;
+    case ul_dcch_msg_type_c::c1_c_::types::ul_info_transfer:
+      break;
+    case ul_dcch_msg_type_c::c1_c_::types::rrc_conn_recfg_complete:
+      break;
+    case ul_dcch_msg_type_c::c1_c_::types::security_mode_complete:
+      break;
+    case ul_dcch_msg_type_c::c1_c_::types::security_mode_fail:
+      break;
+    case ul_dcch_msg_type_c::c1_c_::types::ue_cap_info:
+      break;
+    case ul_dcch_msg_type_c::c1_c_::types::meas_report:
+      break;
+    case ul_dcch_msg_type_c::c1_c_::types::ue_info_resp_r9:
+      break;
+    default:
+      logger.error("The provided UL-DCCH message type is not recognized or supported");
+      break;
+  }
+
+  if (pdu != nullptr) {
+    pdu->N_bytes += sizeof(uint32_t); // MAC-I
   }
 }
 
@@ -2544,10 +2602,14 @@ void rrc::handle_con_setup(const rrc_conn_setup_s& setup)
 
   nas->set_barring(srsran::barring_t::none);
 
-  if (dedicated_info_nas.get()) {
-    send_con_setup_complete(std::move(dedicated_info_nas));
-  } else {
-    logger.error("Pending to transmit a ConnectionSetupComplete but no dedicatedInfoNAS was in queue");
+  // if (dedicated_info_nas.get()) {
+  //   send_con_setup_complete(std::move(dedicated_info_nas));
+  // } else {
+  //   logger.error("Pending to transmit a ConnectionSetupComplete but no dedicatedInfoNAS was in queue");
+  // }
+
+  if (dedicated_info_rrc.get()) {
+    pdcp->write_sdu(srb_to_lcid(lte_srb::srb1), std::move(dedicated_info_rrc));
   }
 }
 

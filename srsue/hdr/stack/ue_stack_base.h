@@ -53,6 +53,7 @@ typedef struct {
   std::string nas_level;
   std::string usim_level;
   std::string stack_level;
+  std::string mitm_level;
 
   int mac_hex_limit;
   int rlc_hex_limit;
@@ -62,7 +63,15 @@ typedef struct {
   int nas_hex_limit;
   int usim_hex_limit;
   int stack_hex_limit;
+  int mitm_hex_limit;
 } stack_log_args_t;
+
+typedef struct {
+  std::string local_addr;
+  uint16_t    local_port;
+  std::string remote_addr;
+  uint16_t    remote_port;
+} mitm_args_t;
 
 typedef struct {
   std::string      type;
@@ -76,6 +85,7 @@ typedef struct {
   gw_args_t        gw;
   uint32_t         sync_queue_size; // Max allowed difference between PHY and Stack clocks (in TTI)
   bool             have_tti_time_stats;
+  mitm_args_t      mitm;
 } stack_args_t;
 
 class ue_stack_base

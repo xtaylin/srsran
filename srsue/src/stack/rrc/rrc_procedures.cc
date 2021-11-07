@@ -1034,11 +1034,11 @@ srsran::proc_outcome_t rrc::connection_reconf_no_ho_proc::react(const bool& conf
     return proc_outcome_t::yield;
   }
 
-  if (has_5g_nr_reconfig == true) {
-    rrc_ptr->send_rrc_con_reconfig_complete(true);
-  } else {
-    rrc_ptr->send_rrc_con_reconfig_complete();
-  }
+  // if (has_5g_nr_reconfig == true) {
+  //   rrc_ptr->send_rrc_con_reconfig_complete(true);
+  // } else {
+  //   rrc_ptr->send_rrc_con_reconfig_complete();
+  // }
 
   srsran::unique_byte_buffer_t nas_pdu;
   for (auto& pdu : rx_recfg.ded_info_nas_list) {
@@ -1697,8 +1697,8 @@ srsran::proc_outcome_t rrc::ho_proc::init(const asn1::rrc::rrc_conn_recfg_s& rrc
     return proc_outcome_t::yield; // wait for t304 expiry
   }
 
-  // Have RRCReconfComplete message ready when Msg3 is sent
-  rrc_ptr->send_rrc_con_reconfig_complete();
+  // // Have RRCReconfComplete message ready when Msg3 is sent
+  // rrc_ptr->send_rrc_con_reconfig_complete();
 
   // SCell addition/removal can take some time to compute. Enqueue in a background task and do it in the end.
   rrc_ptr->apply_scell_config(&recfg_r8, false);

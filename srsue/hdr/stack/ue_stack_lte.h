@@ -50,6 +50,8 @@
 #include "srsue/hdr/ue_metrics_interface.h"
 #include "ue_stack_base.h"
 
+#include "upper/mitm.h"
+
 namespace srsue {
 
 class phy_interface_stack_lte;
@@ -199,6 +201,7 @@ private:
   srslog::basic_logger& rrc_logger;
   srslog::basic_logger& usim_logger;
   srslog::basic_logger& nas_logger;
+  srslog::basic_logger& mitm_logger;
 
   // UE nr stack logging
   srslog::basic_logger& mac_nr_logger;
@@ -231,6 +234,7 @@ private:
   srsue::mac_nr              mac_nr;
   srsue::rrc_nr              rrc_nr;
   srsue::nas                 nas;
+  srsue::mitm                mitm;
   std::unique_ptr<usim_base> usim;
 
   // Metrics helper

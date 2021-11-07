@@ -128,6 +128,8 @@ void parse_args(all_args_t* args, int argc, char* argv[])
     ("log.s1ap_hex_limit",bpo::value<int>(&args->stack.log.s1ap_hex_limit), "S1AP log hex dump limit")
     ("log.stack_level",    bpo::value<string>(&args->stack.log.stack_level),  "Stack log level")
     ("log.stack_hex_limit",bpo::value<int>(&args->stack.log.stack_hex_limit), "Stack log hex dump limit")
+    ("log.mitm_level", bpo::value<string>(&args->stack.log.mitm_level), "MITM log level")
+    ("log.mitm_hex_limit", bpo::value<int>(&args->stack.log.mitm_hex_limit), "MITM log hex dump limit")
 
     ("log.all_level",     bpo::value<string>(&args->log.all_level)->default_value("info"),   "ALL log level")
     ("log.all_hex_limit", bpo::value<int>(&args->log.all_hex_limit)->default_value(32),  "ALL log hex dump limit")
@@ -250,6 +252,12 @@ void parse_args(all_args_t* args, int argc, char* argv[])
     ("coreless.ip_netmask", bpo::value<string>(&args->stack.coreless.gw_args.tun_dev_netmask)->default_value("255.255.255.0"), "Netmask of the TUN device")
     ("coreless.drb_lcid", bpo::value<uint8_t>(&args->stack.coreless.drb_lcid)->default_value(4), "LCID of the dummy DRB")
     ("coreless.rnti", bpo::value<uint16_t >(&args->stack.coreless.rnti)->default_value(1234), "RNTI of the dummy user")
+
+    // MITM section
+    ("mitm.local_addr", bpo::value<string>(&args->stack.mitm.local_addr)->default_value("127.0.0.1"), "Local address for MITM connection")
+    ("mitm.local_port", bpo::value<uint16_t>(&args->stack.mitm.local_port)->default_value(36864), "Local port for MITM connection")
+    ("mitm.remote_addr", bpo::value<string>(&args->stack.mitm.remote_addr)->default_value("127.0.0.1"), "Remote address for MITM connection")
+    ("mitm.remote_port", bpo::value<uint16_t>(&args->stack.mitm.remote_port)->default_value(36865), "Remote port for MITM connection")
     ;
 
   // Positional options - config file location
@@ -384,6 +392,9 @@ void parse_args(all_args_t* args, int argc, char* argv[])
     if (!vm.count("log.stack_level")) {
       args->stack.log.stack_level = args->log.all_level;
     }
+    if (!vm.count("log.mitm_level")) {
+      args->stack.log.mitm_level = args->log.all_level;
+    }
   }
 
   // Apply all_hex_limit to any unset layers
@@ -411,6 +422,9 @@ void parse_args(all_args_t* args, int argc, char* argv[])
     }
     if (!vm.count("log.stack_hex_limit")) {
       args->stack.log.stack_hex_limit = args->log.all_hex_limit;
+    }
+    if (!vm.count("log.mitm_hex_limit")) {
+      args->stack.log.mitm_hex_limit = args->log.all_hex_limit;
     }
   }
 

@@ -32,6 +32,8 @@
 #include "srsran/interfaces/enb_rlc_interfaces.h"
 #include "srsran/interfaces/enb_s1ap_interfaces.h"
 
+#include "srsran/interfaces/enb_mitm_interfaces.h"
+
 using namespace asn1::rrc;
 
 namespace srsenb {
@@ -272,6 +274,8 @@ bool rrc::ue::is_idle()
 
 void rrc::ue::parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t pdu)
 {
+  pdu->N_bytes -= sizeof(uint32_t); // MAC-I
+
   ul_dcch_msg_s  ul_dcch_msg;
   asn1::cbit_ref bref(pdu->msg, pdu->N_bytes);
   if (ul_dcch_msg.unpack(bref) != asn1::SRSASN_SUCCESS or
@@ -293,12 +297,12 @@ void rrc::ue::parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t pdu)
 
   switch (ul_dcch_msg.msg.c1().type()) {
     case ul_dcch_msg_type_c::c1_c_::types::rrc_conn_setup_complete:
-      save_ul_message(std::move(original_pdu));
+      // save_ul_message(std::move(original_pdu));
       handle_rrc_con_setup_complete(&ul_dcch_msg.msg.c1().rrc_conn_setup_complete(), std::move(pdu));
       set_activity();
       break;
     case ul_dcch_msg_type_c::c1_c_::types::rrc_conn_reest_complete:
-      save_ul_message(std::move(original_pdu));
+      // save_ul_message(std::move(original_pdu));
       handle_rrc_con_reest_complete(&ul_dcch_msg.msg.c1().rrc_conn_reest_complete(), std::move(pdu));
       set_activity();
       break;
@@ -317,10 +321,10 @@ void rrc::ue::parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t pdu)
                  .ded_info_type.ded_info_nas()
                  .data(),
              pdu->N_bytes);
-      parent->s1ap->write_pdu(rnti, std::move(pdu));
+      // parent->s1ap->write_pdu(rnti, std::move(pdu));
       break;
     case ul_dcch_msg_type_c::c1_c_::types::rrc_conn_recfg_complete:
-      save_ul_message(std::move(original_pdu));
+      // save_ul_message(std::move(original_pdu));
       handle_rrc_reconf_complete(&ul_dcch_msg.msg.c1().rrc_conn_recfg_complete(), std::move(pdu));
       srsran::console("User 0x%x connected\n", rnti);
       state = RRC_STATE_REGISTERED;
@@ -328,7 +332,7 @@ void rrc::ue::parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t pdu)
       break;
     case ul_dcch_msg_type_c::c1_c_::types::security_mode_complete:
       handle_security_mode_complete(&ul_dcch_msg.msg.c1().security_mode_complete());
-      send_ue_cap_enquiry();
+      // send_ue_cap_enquiry();
       state = RRC_STATE_WAIT_FOR_UE_CAP_INFO;
       break;
     case ul_dcch_msg_type_c::c1_c_::types::security_mode_fail:
@@ -336,8 +340,8 @@ void rrc::ue::parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t pdu)
       break;
     case ul_dcch_msg_type_c::c1_c_::types::ue_cap_info:
       if (handle_ue_cap_info(&ul_dcch_msg.msg.c1().ue_cap_info())) {
-        parent->s1ap->ue_ctxt_setup_complete(rnti);
-        send_connection_reconf(std::move(pdu));
+        // parent->s1ap->ue_ctxt_setup_complete(rnti);
+        // send_connection_reconf(std::move(pdu));
         state = RRC_STATE_WAIT_FOR_CON_RECONF_COMPLETE;
       } else {
         send_connection_reject(procedure_result_code::none);
@@ -357,6 +361,50 @@ void rrc::ue::parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t pdu)
     default:
       parent->logger.error("Msg: %s not supported", ul_dcch_msg.msg.c1().type().to_string());
       break;
+  }
+
+  if (original_pdu != nullptr) {
+    original_pdu->N_bytes += sizeof(uint32_t); // MAC-I
+    parent->mitm->write_sdu(rnti, lcid, std::move(original_pdu));
+  }
+}
+
+void rrc::ue::parse_dl_dcch(uint32_t lcid, srsran::unique_byte_buffer_t& pdu)
+{
+  pdu->N_bytes -= sizeof(uint32_t); // MAC-I
+
+  dl_dcch_msg_s  dl_dcch_msg;
+  asn1::cbit_ref bref(pdu->msg, pdu->N_bytes);
+  if (dl_dcch_msg.unpack(bref) != asn1::SRSASN_SUCCESS or
+      dl_dcch_msg.msg.type().value != dl_dcch_msg_type_c::types_opts::c1) {
+    parent->logger.error("Failed to unpack DL-DCCH message");
+    return;
+  }
+
+  parent->log_rrc_message(get_rb_name(lcid), Rx, pdu.get(), dl_dcch_msg, dl_dcch_msg.msg.c1().type().to_string());
+
+  dl_dcch_msg_type_c::c1_c_* c1 = &dl_dcch_msg.msg.c1();
+  switch (dl_dcch_msg.msg.c1().type()) {
+    case dl_dcch_msg_type_c::c1_c_::types::dl_info_transfer:
+      break;
+    case dl_dcch_msg_type_c::c1_c_::types::security_mode_cmd:
+      break;
+    case dl_dcch_msg_type_c::c1_c_::types::rrc_conn_recfg:
+      handle_rrc_con_reconfig(dl_dcch_msg.msg.c1().rrc_conn_recfg());
+      break;
+    case dl_dcch_msg_type_c::c1_c_::types::ue_cap_enquiry:
+      break;
+    case dl_dcch_msg_type_c::c1_c_::types::rrc_conn_release:
+      // delay user deletion for ~50 TTI (until RRC release is sent)
+      parent->task_sched.defer_callback(50, [&]() { parent->rem_user_thread(rnti); });
+      break;
+    default:
+      parent->logger.error("Msg: %s not supported", dl_dcch_msg.msg.c1().type().to_string());
+      break;
+  }
+
+  if (pdu != nullptr) {
+    pdu->N_bytes += sizeof(uint32_t); // MAC-I
   }
 }
 
@@ -378,11 +426,11 @@ void rrc::ue::handle_rrc_con_req(rrc_conn_request_s* msg)
                                     static_cast<unsigned>(procedure_result_code::none),
                                     rnti);
 
-  if (not parent->s1ap->is_mme_connected()) {
-    parent->logger.error("MME isn't connected. Sending Connection Reject");
-    send_connection_reject(procedure_result_code::error_mme_not_connected);
-    return;
-  }
+  // if (not parent->s1ap->is_mme_connected()) {
+  //   parent->logger.error("MME isn't connected. Sending Connection Reject");
+  //   send_connection_reject(procedure_result_code::error_mme_not_connected);
+  //   return;
+  // }
 
   rrc_conn_request_r8_ies_s* msg_r8 = &msg->crit_exts.rrc_conn_request_r8();
 
@@ -477,9 +525,9 @@ void rrc::ue::handle_rrc_con_setup_complete(rrc_conn_setup_complete_s* msg, srsr
 
   uint32_t enb_cc_idx = ue_cell_list.get_ue_cc_idx(UE_PCELL_CC_IDX)->cell_common->enb_cc_idx;
   if (has_tmsi) {
-    parent->s1ap->initial_ue(rnti, enb_cc_idx, s1ap_cause, std::move(pdu), m_tmsi, mmec);
+    // parent->s1ap->initial_ue(rnti, enb_cc_idx, s1ap_cause, std::move(pdu), m_tmsi, mmec);
   } else {
-    parent->s1ap->initial_ue(rnti, enb_cc_idx, s1ap_cause, std::move(pdu));
+    // parent->s1ap->initial_ue(rnti, enb_cc_idx, s1ap_cause, std::move(pdu));
   }
   state = RRC_STATE_WAIT_FOR_CON_RECONF_COMPLETE;
 
@@ -529,12 +577,12 @@ void rrc::ue::handle_rrc_con_reest_req(rrc_conn_reest_request_s* msg)
   srsran::console(
       "User 0x%x requesting RRC Reestablishment as 0x%x. Cause: %s\n", rnti, old_rnti, req_r8.reest_cause.to_string());
 
-  if (not parent->s1ap->is_mme_connected()) {
-    parent->logger.error("MME isn't connected. Sending Connection Reject");
-    send_connection_reest_rej(procedure_result_code::error_mme_not_connected);
-    srsran::console("User 0x%x RRC Reestablishment Request rejected\n", rnti);
-    return;
-  }
+  // if (not parent->s1ap->is_mme_connected()) {
+  //   parent->logger.error("MME isn't connected. Sending Connection Reject");
+  //   send_connection_reest_rej(procedure_result_code::error_mme_not_connected);
+  //   srsran::console("User 0x%x RRC Reestablishment Request rejected\n", rnti);
+  //   return;
+  // }
   parent->logger.debug("rnti=0x%x, phyid=0x%x, smac=0x%x, cause=%s",
                        (uint32_t)msg->crit_exts.rrc_conn_reest_request_r8().ue_id.c_rnti.to_number(),
                        msg->crit_exts.rrc_conn_reest_request_r8().ue_id.pci,
@@ -1457,6 +1505,35 @@ int rrc::ue::get_ri(uint32_t m_ri, uint16_t* ri_idx)
   }
 
   return ret;
+}
+
+void rrc::ue::handle_rrc_con_reconfig(const rrc_conn_recfg_s& msg)
+{
+  const rrc_conn_recfg_r8_ies_s& recfg_r8 = msg.crit_exts.c1().rrc_conn_recfg_r8();
+
+  if (recfg_r8.rr_cfg_ded.drb_to_add_mod_list_present) {
+    for (auto& drb : recfg_r8.rr_cfg_ded.drb_to_add_mod_list) {
+      bearer_list.add_drb(drb);
+    }
+  }
+
+  if (recfg_r8.rr_cfg_ded.drb_to_release_list_present) {
+    for (auto& drb_id : recfg_r8.rr_cfg_ded.drb_to_release_list) {
+      bearer_list.release_drb(drb_id);
+    }
+  }
+
+  /* Apply updates present in RRCConnectionReconfiguration to lower layers */
+  // apply PHY config
+  apply_reconf_phy_config(recfg_r8, true);
+
+  // setup SRB2/DRBs in PDCP and RLC
+  apply_rlc_rb_updates(recfg_r8.rr_cfg_ded);
+  apply_pdcp_srb_updates(recfg_r8.rr_cfg_ded);
+  apply_pdcp_drb_updates(recfg_r8.rr_cfg_ded);
+
+  // UE MAC scheduler updates
+  mac_ctrl.handle_con_reconf(recfg_r8, ue_capabilities);
 }
 
 } // namespace srsenb

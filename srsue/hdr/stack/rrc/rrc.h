@@ -73,6 +73,7 @@ class pdcp_interface_rrc;
 class rlc_interface_rrc;
 class nas_interface_rrc;
 class phy_interface_rrc_lte;
+class mitm_interface_rrc;
 
 class rrc : public rrc_interface_nas,
             public rrc_interface_phy_lte,
@@ -80,6 +81,7 @@ class rrc : public rrc_interface_nas,
             public rrc_interface_pdcp,
             public rrc_eutra_interface_rrc_nr,
             public rrc_interface_rlc,
+            public rrc_interface_mitm,
             public srsran::timer_callback
 {
 public:
@@ -94,6 +96,7 @@ public:
             usim_interface_rrc*    usim_,
             gw_interface_rrc*      gw_,
             rrc_nr_interface_rrc*  rrc_nr_,
+            mitm_interface_rrc*    mitm_,
             const rrc_args_t&      args_);
 
   void stop();
@@ -157,6 +160,9 @@ public:
   void write_pdu_pcch(srsran::unique_byte_buffer_t pdu);
   void write_pdu_mch(uint32_t lcid, srsran::unique_byte_buffer_t pdu);
 
+  // MITM interface
+  void parse_ul_dcch(uint32_t lcid, srsran::unique_byte_buffer_t& pdu);
+
   bool srbs_flushed(); //< Check if data on SRBs still needs to be sent
 
 protected:
@@ -191,7 +197,9 @@ private:
   usim_interface_rrc*          usim   = nullptr;
   gw_interface_rrc*            gw     = nullptr;
   rrc_nr_interface_rrc*        rrc_nr = nullptr;
+  mitm_interface_rrc*          mitm   = nullptr;
   srsran::unique_byte_buffer_t dedicated_info_nas;
+  srsran::unique_byte_buffer_t dedicated_info_rrc;
 
   void send_ul_ccch_msg(const asn1::rrc::ul_ccch_msg_s& msg);
   void send_ul_dcch_msg(uint32_t lcid, const asn1::rrc::ul_dcch_msg_s& msg);

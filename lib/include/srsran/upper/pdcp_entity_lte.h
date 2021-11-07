@@ -34,6 +34,7 @@ namespace srsue {
 
 class gw_interface_pdcp;
 class rlc_interface_pdcp;
+class mitm_interface_pdcp;
 
 } // namespace srsue
 
@@ -112,12 +113,13 @@ private:
 class pdcp_entity_lte final : public pdcp_entity_base
 {
 public:
-  pdcp_entity_lte(srsue::rlc_interface_pdcp* rlc_,
-                  srsue::rrc_interface_pdcp* rrc_,
-                  srsue::gw_interface_pdcp*  gw_,
-                  srsran::task_sched_handle  task_sched_,
-                  srslog::basic_logger&      logger,
-                  uint32_t                   lcid_);
+  pdcp_entity_lte(srsue::rlc_interface_pdcp*  rlc_,
+                  srsue::rrc_interface_pdcp*  rrc_,
+                  srsue::gw_interface_pdcp*   gw_,
+                  srsue::mitm_interface_pdcp* mitm_,
+                  srsran::task_sched_handle   task_sched_,
+                  srslog::basic_logger&       logger,
+                  uint32_t                    lcid_);
   ~pdcp_entity_lte() override;
   bool configure(const pdcp_config_t& cnfg_) override;
   void reset() override;
@@ -155,9 +157,10 @@ public:
   size_t nof_discard_timers() const { return undelivered_sdus != nullptr ? undelivered_sdus->nof_discard_timers() : 0; }
 
 private:
-  srsue::rlc_interface_pdcp* rlc = nullptr;
-  srsue::rrc_interface_pdcp* rrc = nullptr;
-  srsue::gw_interface_pdcp*  gw  = nullptr;
+  srsue::rlc_interface_pdcp*  rlc  = nullptr;
+  srsue::rrc_interface_pdcp*  rrc  = nullptr;
+  srsue::gw_interface_pdcp*   gw   = nullptr;
+  srsue::mitm_interface_pdcp* mitm = nullptr;
 
   // State variables, as defined in TS 36 323, section 7.1
   pdcp_lte_state_t st = {};

@@ -29,6 +29,8 @@
 #include "srsran/upper/pdcp.h"
 #include <map>
 
+#include "srsran/interfaces/ue_mitm_interfaces.h"
+
 #ifndef SRSENB_PDCP_H
 #define SRSENB_PDCP_H
 
@@ -37,13 +39,17 @@ namespace srsenb {
 class rrc_interface_pdcp;
 class rlc_interface_pdcp;
 class gtpu_interface_pdcp;
+class mitm_interface_pdcp;
 
-class pdcp : public pdcp_interface_rlc, public pdcp_interface_gtpu, public pdcp_interface_rrc
+class pdcp : public pdcp_interface_rlc,
+             public pdcp_interface_gtpu,
+             public pdcp_interface_rrc,
+             public pdcp_interface_mitm
 {
 public:
   pdcp(srsran::task_sched_handle task_sched_, srslog::basic_logger& logger);
   virtual ~pdcp() {}
-  void init(rlc_interface_pdcp* rlc_, rrc_interface_pdcp* rrc_, gtpu_interface_pdcp* gtpu_);
+  void init(rlc_interface_pdcp* rlc_, rrc_interface_pdcp* rrc_, gtpu_interface_pdcp* gtpu_, mitm_interface_pdcp* mitm_);
   void stop();
 
   // pdcp_interface_rlc
@@ -111,12 +117,22 @@ private:
     const char* get_rb_name(uint32_t lcid);
   };
 
+  class user_interface_mitm : public srsue::mitm_interface_pdcp
+  {
+  public:
+    uint16_t                     rnti;
+    srsenb::mitm_interface_pdcp* mitm;
+    // mitm_interface_pdcp
+    void write_sdu(uint32_t lcid, srsran::unique_byte_buffer_t sdu);
+  };
+
   class user_interface
   {
   public:
     user_interface_rlc            rlc_itf;
     user_interface_gtpu           gtpu_itf;
     user_interface_rrc            rrc_itf;
+    user_interface_mitm           mitm_itf;
     unique_rnti_ptr<srsran::pdcp> pdcp;
   };
 
@@ -127,6 +143,7 @@ private:
   rlc_interface_pdcp*       rlc  = nullptr;
   rrc_interface_pdcp*       rrc  = nullptr;
   gtpu_interface_pdcp*      gtpu = nullptr;
+  mitm_interface_pdcp*      mitm = nullptr;
   srsran::task_sched_handle task_sched;
   srslog::basic_logger&     logger;
 };
