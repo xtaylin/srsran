@@ -52,7 +52,7 @@ static void crash_handler(int sig)
     char       strdate[32];
 
     time(&lnTime);
-    gmtime_r(&lnTime, &stTime);
+    localtime_r(&lnTime, &stTime);
 
     strftime(strdate, sizeof(strdate), "%d/%m/%Y %H:%M:%S", &stTime);
 
