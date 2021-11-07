@@ -142,7 +142,7 @@ bool s1ap_mngmt_proc::unpack_s1_setup_request(const asn1::s1ap::s1_setup_request
   }
 
   // eNB Id
-  enb_ctx->enb_id = s1_req.global_enb_id.value.enb_id.macro_enb_id().to_number();
+  enb_ctx->enb_id = s1_req.global_enb_id.value.enb_id.home_enb_id().to_number();
 
   // PLMN Id
   ((uint8_t*)&plmn)[1] = s1_req.global_enb_id.value.plm_nid[0];
