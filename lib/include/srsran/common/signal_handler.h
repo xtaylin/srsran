@@ -36,7 +36,7 @@
 extern "C" {
 #endif // __cplusplus
 
-#define SRSRAN_TERM_TIMEOUT_S (5)
+#define SRSRAN_TERM_TIMEOUT_S (10)
 
 // static vars required by signal handling
 static srslog::sink* log_sink = nullptr;
