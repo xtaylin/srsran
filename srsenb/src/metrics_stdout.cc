@@ -179,12 +179,17 @@ void metrics_stdout::set_metrics_helper(uint32_t                          num_ue
 
 void metrics_stdout::set_metrics(const enb_metrics_t& metrics, const uint32_t period_usec)
 {
-  if (!do_print || enb == nullptr) {
+  if (enb == nullptr) {
     return;
   }
 
+  // always print RF error
   if (metrics.rf.rf_error) {
     fmt::print("RF status: O={}, U={}, L={}\n", metrics.rf.rf_o, metrics.rf.rf_u, metrics.rf.rf_l);
+  }
+
+  if (!do_print) {
+    return;
   }
 
   if (metrics.stack.rrc.ues.size() == 0) {
