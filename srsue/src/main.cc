@@ -23,24 +23,30 @@
 #include "srsran/common/config_file.h"
 #include "srsran/common/crash_handler.h"
 #include "srsran/common/metrics_hub.h"
-#include "srsran/common/signal_handler.h"
+#include "srsran/common/multiqueue.h"
+#include "srsran/common/tsan_options.h"
 #include "srsran/srslog/event_trace.h"
 #include "srsran/srslog/srslog.h"
 #include "srsran/srsran.h"
+#include "srsran/support/emergency_handlers.h"
+#include "srsran/support/signal_handler.h"
 #include "srsran/version.h"
 #include "srsue/hdr/metrics_csv.h"
+#include "srsue/hdr/metrics_json.h"
 #include "srsue/hdr/metrics_stdout.h"
 #include "srsue/hdr/ue.h"
 #include <boost/program_options.hpp>
 #include <boost/program_options/parsers.hpp>
+#include <csignal>
 #include <iostream>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <sys/mman.h>
 #include <unistd.h>
 
-extern bool simulate_rlf;
+extern std::atomic<bool> simulate_rlf;
 
 using namespace std;
 using namespace srsue;
@@ -50,8 +56,10 @@ namespace bpo = boost::program_options;
  *  Local static variables
  ***********************************************************************/
 
-static bool            do_metrics     = false;
-static metrics_stdout* metrics_screen = nullptr;
+static bool              do_metrics     = false;
+static metrics_stdout*   metrics_screen = nullptr;
+static srslog::sink*     log_sink       = nullptr;
+static std::atomic<bool> running        = {true};
 
 /**********************************************************************
  *  Program arguments processing
@@ -73,7 +81,6 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
   common.add_options()
     ("ue.radio", bpo::value<string>(&args->rf.type)->default_value("multi"), "Type of the radio [multi]")
     ("ue.phy", bpo::value<string>(&args->phy.type)->default_value("lte"), "Type of the PHY [lte]")
-    ("ue.stack", bpo::value<string>(&args->stack.type)->default_value("lte"), "Type of the upper stack [lte, nr]")
 
     ("rf.srate",        bpo::value<double>(&args->rf.srate_hz)->default_value(0.0),          "Force Tx and Rx sampling rate in Hz")
     ("rf.freq_offset",  bpo::value<float>(&args->rf.freq_offset)->default_value(0),          "(optional) Frequency offset")
@@ -383,6 +390,10 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
        bpo::value<float>(&args->phy.force_ul_amplitude)->default_value(0.0),
        "Forces the peak amplitude in the PUCCH, PUSCH and SRS (set 0.0 to 1.0, set to 0 or negative for disabling)")
 
+    ("phy.detect_cp",
+      bpo::value<bool>(&args->phy.detect_cp)->default_value(false),
+      "enable CP length detection")
+
     ("phy.in_sync_rsrp_dbm_th",
      bpo::value<float>(&args->phy.in_sync_rsrp_dbm_th)->default_value(-130.0f),
      "RSRP threshold (in dBm) above which the UE considers to be in-sync")
@@ -406,6 +417,11 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
     ("phy.force_N_id_2",
      bpo::value<int>(&args->phy.force_N_id_2)->default_value(-1),
      "Force using a specific PSS (set to -1 to allow all PSSs).")
+
+    // PHY NR args
+    ("phy.nr.store_pdsch_ko",
+      bpo::value<bool>(&args->phy.nr_store_pdsch_ko)->default_value(false),
+      "Dumps the PDSCH baseband samples into a file on KO reception.")
 
     // UE simulation args
     ("sim.airplane_t_on_ms",
@@ -436,6 +452,14 @@ static int parse_args(all_args_t* args, int argc, char* argv[])
     ("general.metrics_csv_flush_period_sec",
            bpo::value<int>(&args->general.metrics_csv_flush_period_sec)->default_value(-1),
            "Periodicity in s to flush CSV file to disk (-1 for auto)")
+
+    ("general.metrics_json_enable",
+     bpo::value<bool>(&args->general.metrics_json_enable)->default_value(false),
+     "Write UE metrics to a JSON file")
+
+    ("general.metrics_json_filename",
+     bpo::value<string>(&args->general.metrics_json_filename)->default_value("/tmp/ue_metrics.json"),
+     "Metrics JSON filename")
 
     ("general.tracing_enable",
            bpo::value<bool>(&args->general.tracing_enable)->default_value(false),
@@ -628,8 +652,11 @@ static void* input_loop(void*)
           metrics_screen->toggle_print(do_metrics);
         }
       } else if (key == "rlf") {
-        simulate_rlf = true;
+        simulate_rlf.store(true, std::memory_order_relaxed);
         cout << "Sending Radio Link Failure" << endl;
+      } else if (key == "flush") {
+        srslog::flush();
+        cout << "Flushed log file buffers" << endl;
       } else if (key == "q") {
         // let the signal handler do the job
         raise(SIGTERM);
@@ -645,9 +672,25 @@ static size_t fixup_log_file_maxsize(int x)
   return (x < 0) ? 0 : size_t(x) * 1024u;
 }
 
+extern "C" void srsran_dft_exit();
+static void     emergency_cleanup_handler(void* data)
+{
+  srslog::flush();
+  if (log_sink) {
+    log_sink->flush();
+  }
+  srsran_dft_exit();
+}
+
+static void signal_handler()
+{
+  running = false;
+}
+
 int main(int argc, char* argv[])
 {
-  srsran_register_signal_handler();
+  srsran_register_signal_handler(signal_handler);
+  add_emergency_cleanup_handler(emergency_cleanup_handler, nullptr);
   srsran_debug_handle_crash(argc, argv);
 
   all_args_t args = {};
@@ -684,6 +727,10 @@ int main(int argc, char* argv[])
 
   srsran::check_scaling_governor(args.rf.device_name);
 
+  if (mlockall((uint32_t)MCL_CURRENT | (uint32_t)MCL_FUTURE) == -1) {
+    fprintf(stderr, "Failed to `mlockall`: %d", errno);
+  }
+
   // Create UE instance.
   srsue::ue ue;
   if (ue.init(args)) {
@@ -706,6 +753,18 @@ int main(int argc, char* argv[])
     if (args.general.metrics_csv_flush_period_sec > 0) {
       metrics_file.set_flush_period((uint32_t)args.general.metrics_csv_flush_period_sec);
     }
+  }
+
+  // Set up the JSON log channel used by metrics.
+  srslog::sink& json_sink =
+      srslog::fetch_file_sink(args.general.metrics_json_filename, 0, false, srslog::create_json_formatter());
+  srslog::log_channel& json_channel = srslog::fetch_log_channel("JSON_channel", json_sink, {});
+  json_channel.set_enabled(args.general.metrics_json_enable);
+
+  srsue::metrics_json json_metrics(json_channel);
+  if (args.general.metrics_json_enable) {
+    metricshub.add_listener(&json_metrics);
+    json_metrics.set_ue_handle(&ue);
   }
 
   pthread_t input;
